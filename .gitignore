@@ -1,6 +1,9 @@
 # Maven build output
 target/
 
+# Local H2 files (Capstone 4)
+data/
+
 # IDE files
 .idea/
 *.iml

@@ -10,7 +10,7 @@ PayNest is a fictional platform that allows merchants to:
 - Accept customer orders
 - Process payments via multiple payment methods (card, EFT, wallet)
 
-The codebase is designed for beginner–intermediate Java students and will be extended through multiple capstones. It uses pure Java (no frameworks) with a clear, readable structure.
+The codebase is designed for beginner–intermediate Java students and will be extended through multiple capstones. Later capstones add persistence and optional AI-assisted monitoring; early capstones use plain Java with clear packages.
 
 ## Company Background
 
@@ -22,6 +22,7 @@ PayNest is a fictional fintech company providing a simplified commerce backend. 
 
 - Java 21
 - Maven 3.6+
+- **Capstone 5 only:** [Ollama](https://ollama.com/) installed locally (`ollama serve`), with a small model pulled (for example `ollama pull llama3.2`)
 
 ### Build and Run
 
@@ -59,67 +60,81 @@ Amount: R12400
 Order completed successfully.
 ```
 
-## Capstone 1 Description
+The default `PayNestApplication` demonstrates **Capstones 1–2** only. Capstones 3–5 are exercised from tests or your own `main` methods.
 
-**Core Commerce Engine**
+## Capstone assessments (authoritative briefs)
 
-Capstone 1 introduces the fundamental domain models and business logic:
+Learner-facing **project briefs**, **deliverables**, and **rubrics** live under **[`docs/assessments/`](docs/assessments/README.md)**. Use them as the assignment specification; this README stays focused on build, layout, and quick orientation.
 
-- **Domain Models:** `Product`, `Customer`, `OrderItem`, `Order`
-- **Business Service:** `OrderService` for creating orders and adding products
-- **CLI Application:** `PayNestApplication` demonstrates the full flow: create products, create a customer, create an order, add products, and print a summary
+| Capstone | Brief |
+|----------|--------|
+| 1 | [Merchant order desk and catalogue engine](docs/assessments/capstone-01-commerce-engine.md) |
+| 2 | [Unified checkout across payment rails](docs/assessments/capstone-02-payment-methods.md) |
+| 3 | [Smart rails selection and transaction risk](docs/assessments/capstone-03-routing-risk.md) |
+| 4 | [Durable payment attempts and operations-grade reliability](docs/assessments/capstone-04-persistence-reliability.md) |
+| 5 | [Near-real-time risk monitoring with local LLM assistance](docs/assessments/capstone-05-agentic-monitoring.md) |
 
-Students learn: classes, objects, constructors, encapsulation, collections, and basic business logic.
+**Scaffolding note:** Capstones 3–5 ship with interfaces, skeleton implementations, and `TODO`s in code—complete behaviour to the brief, not only the stubs.
 
-## Capstone 2 Description
+### Architecture (capstones 3–5)
 
-**OOP Payment System**
-
-Capstone 2 extends the codebase with a payment system using interfaces and polymorphism:
-
-- **Payment Interface:** `PaymentMethod` with `processPayment(double amount)` and `getPaymentType()`
-- **Implementations:** `CardPayment`, `EftPayment`, `WalletPayment`
-- **Payment Processor:** `PaymentProcessor` accepts any `PaymentMethod` and processes the payment
-- **Order Update:** `Order.checkout(PaymentMethod)` calculates the total, processes payment, and prints confirmation
-
-Students learn: interfaces, inheritance, polymorphism, and dependency design.
-
-## Capstone 3 Description
-
-**Adaptive Payment Routing & Risk Engine (Skeleton)**
-
-Capstone 3 adds a **barebones scaffolding** for routing transactions to payment providers and assessing risk. **It is not a complete solution:** methods are stubs or placeholders with `TODO` comments so students can implement policy, thresholds, and integration.
-
-**Core concepts:**
-
-- **Interfaces:** `PaymentProvider`, `RoutingRule`, `RiskEvaluator`, `RoutingEngine` — contracts only; students fill in behavior.
-- **Routing:** `DefaultRoutingEngine` + `RouteDecision` — loop shell and placeholder decision; students implement rule ordering, provider selection, and fallback.
-- **Rules:** `AbstractRoutingRule` and example rules (`AmountRoutingRule`, `BankSupportRule`, `FallbackRule`) — default `matches` returns false; students encode real conditions.
-- **Providers:** `BasePaymentProvider`, `ProviderA`, `ProviderB` — placeholder `process` implementations.
-- **Risk:** `RiskLevel` enum and `BasicRiskEvaluator` — default `LOW`; students add amount/frequency logic.
-- **Config & audit:** `RoutingConfig` for priority/thresholds structure; `DecisionLogger` prints to the console for now.
-
-**New domain:** `Transaction` (`amount`, `bank`, `timestamp`) for routing and risk evaluation.
-
-Run tests with `mvn test`. The main entry point (`PayNestApplication`) still demonstrates Capstones 1–2; you can wire `DefaultRoutingEngine` and sample lists in your own `main` or tests as you explore Capstone 3.
+```mermaid
+flowchart LR
+  subgraph cap4 [Capstone4]
+    Pipeline[ReliablePipeline]
+    Store[TransactionRecordStore]
+    Idem[IdempotencyRegistry]
+    Reports[ReportGenerator]
+  end
+  subgraph cap3 [Capstone3]
+    Router[RoutingEngine]
+    Risk[RiskEvaluator]
+  end
+  subgraph cap5 [Capstone5]
+    Queue[EventQueue]
+    Ollama[OllamaClient]
+    Hybrid[HybridRisk]
+    AiLog[AiDecisionStore]
+  end
+  Queue --> Pipeline
+  Pipeline --> Idem
+  Pipeline --> Router
+  Pipeline --> Risk
+  Hybrid --> Risk
+  Hybrid --> Ollama
+  Pipeline --> Store
+  Hybrid --> AiLog
+  Store --> Reports
+```
 
 ## Learning Objectives
 
+Objectives are summarized here; each assessment brief defines outcomes and grading in detail.
+
 - **Capstone 1:** Classes, objects, constructors, encapsulation, collections (`List`), basic business logic
 - **Capstone 2:** Interfaces, inheritance, polymorphism, dependency design, basic architecture
-- **Capstone 3:** Layered design, strategy-style routing, risk scoring, configuration placeholders, and extending interfaces without a finished rules engine
+- **Capstone 3:** Layered design, strategy-style routing, risk scoring, configuration placeholders, extending interfaces without a finished rules engine
+- **Capstone 4:** Persistence, idempotency, lifecycle state, operational reporting, failure handling
+- **Capstone 5:** Hybrid risk assessment, external HTTP integration, defensive parsing, queued monitoring, audit trails
 
 ## Project Structure
 
 ```
 src/main/java/com/paynestsystem/
-├── domain/      # Core business objects (Product, Customer, OrderItem, Order, Transaction)
-├── service/     # Business logic (OrderService)
-├── payment/     # Payment implementations (PaymentMethod, CardPayment, EftPayment, WalletPayment, PaymentProcessor)
-├── routing/     # RoutingEngine, DefaultRoutingEngine, RouteDecision, DecisionLogger
-├── rules/       # RoutingRule, AbstractRoutingRule, example rules
-├── providers/   # PaymentProvider, BasePaymentProvider, ProviderA, ProviderB
-├── risk/        # RiskLevel, RiskEvaluator, BasicRiskEvaluator
-├── config/      # RoutingConfig (placeholder)
-└── app/         # CLI application entry point (PayNestApplication)
+├── domain/           # Product, Customer, OrderItem, Order, Transaction, TransactionStatus,
+│                     # TransactionRecord, AiDecisionRecord
+├── service/          # OrderService
+├── payment/          # PaymentMethod, implementations, PaymentProcessor
+├── routing/          # RoutingEngine, DefaultRoutingEngine, RouteDecision, DecisionLogger
+├── rules/            # RoutingRule, AbstractRoutingRule, example rules
+├── providers/        # PaymentProvider, BasePaymentProvider, ProviderA, ProviderB
+├── risk/             # RiskLevel, RiskEvaluator, BasicRiskEvaluator, AiResponseParser, HybridRiskEvaluator
+├── config/           # RoutingConfig
+├── persistence/      # TransactionRecordStore, IdempotencyRegistry, AiDecisionStore; InMemory* stubs
+├── persistence/jdbc/ # H2Schema DDL placeholders
+├── reliability/      # ReliableTransactionPipeline, PipelineResult
+├── reporting/        # ReportGenerator, OperationsReport, StubReportGenerator
+├── ollama/           # OllamaConfig, OllamaClient, HttpOllamaClient, UnavailableOllamaClient
+├── monitoring/       # RiskMonitoringService
+└── app/              # PayNestApplication (Capstones 1–2 demo)
 ```

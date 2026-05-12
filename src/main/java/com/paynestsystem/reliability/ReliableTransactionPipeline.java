@@ -1,0 +1,87 @@
+package com.paynestsystem.reliability;
+
+import com.paynestsystem.domain.Transaction;
+import com.paynestsystem.domain.TransactionRecord;
+import com.paynestsystem.domain.TransactionStatus;
+import com.paynestsystem.persistence.IdempotencyRegistry;
+import com.paynestsystem.persistence.TransactionRecordStore;
+import com.paynestsystem.routing.DecisionLogger;
+import com.paynestsystem.routing.RouteDecision;
+import com.paynestsystem.routing.RoutingEngine;
+import com.paynestsystem.risk.RiskEvaluator;
+import com.paynestsystem.risk.RiskLevel;
+
+import java.time.Instant;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Orchestrates idempotency, routing, risk, and persistence (Capstone 4 skeleton — students complete retries,
+ * failure taxonomy, and durable stores).
+ */
+public class ReliableTransactionPipeline {
+
+    private final IdempotencyRegistry idempotencyRegistry;
+    private final TransactionRecordStore transactionRecordStore;
+    private final RoutingEngine routingEngine;
+    private final RiskEvaluator riskEvaluator;
+    private final DecisionLogger decisionLogger;
+
+    public ReliableTransactionPipeline(
+            IdempotencyRegistry idempotencyRegistry,
+            TransactionRecordStore transactionRecordStore,
+            RoutingEngine routingEngine,
+            RiskEvaluator riskEvaluator,
+            DecisionLogger decisionLogger) {
+        this.idempotencyRegistry = Objects.requireNonNull(idempotencyRegistry);
+        this.transactionRecordStore = Objects.requireNonNull(transactionRecordStore);
+        this.routingEngine = Objects.requireNonNull(routingEngine);
+        this.riskEvaluator = Objects.requireNonNull(riskEvaluator);
+        this.decisionLogger = Objects.requireNonNull(decisionLogger);
+    }
+
+    /**
+     * Processes a transaction once per idempotency key; repeats return the stored record (at-least-once delivery
+     * simplified to duplicate detection).
+     */
+    public PipelineResult process(Transaction transaction, String idempotencyKey) {
+        Objects.requireNonNull(transaction);
+        Objects.requireNonNull(idempotencyKey);
+
+        Optional<String> existingId = idempotencyRegistry.lookup(idempotencyKey);
+        if (existingId.isPresent()) {
+            Optional<TransactionRecord> prior = transactionRecordStore.findById(existingId.get());
+            if (prior.isPresent()) {
+                return new PipelineResult(prior.get(), true);
+            }
+            // TODO: registry/store mismatch — repair or alert operations
+        }
+
+        Instant now = Instant.now();
+        String id = UUID.randomUUID().toString();
+        TransactionRecord record = new TransactionRecord(
+                id,
+                idempotencyKey,
+                transaction,
+                TransactionStatus.PENDING,
+                now,
+                now);
+        transactionRecordStore.save(record);
+        idempotencyRegistry.bind(idempotencyKey, id);
+
+        // TODO: transactional boundary between store + registry for production systems
+        RouteDecision decision = routingEngine.route(transaction);
+        decisionLogger.log(decision);
+
+        RiskLevel risk = riskEvaluator.evaluate(transaction);
+        record.setAssessedRisk(risk);
+        record.setRoutingSummary(decision.getReason());
+
+        // TODO: invoke PaymentProvider.process when routing selects a provider; map failures to FAILED + retry policy
+        record.setStatus(TransactionStatus.ROUTED);
+        transactionRecordStore.save(record);
+
+        return new PipelineResult(record, false);
+    }
+}
